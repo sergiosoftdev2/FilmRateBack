@@ -3,7 +3,8 @@ const cors = require('cors')
 const mongoose = require('mongoose');
 const Usuario = require('./models/usuarios'); 
 const { generateHashedPassword, comparePassword } = require('./shared/functions');
-const Rating = require('./models/ratings')
+const Rating = require('./models/ratings');
+const like = require('./models/likes');
 
 const uri = "mongodb+srv://sergiogarlo12:FilmRate2025@filmrate.wnqbttl.mongodb.net/?retryWrites=true&w=majority&appName=filmRate";
 const clientOptions = { serverApi: { version: '1', strict: true, deprecationErrors: true } };
@@ -110,6 +111,8 @@ app.post('/register', async (req, res) => {
     }
 });
 
+
+// USER MOVIE RATINGS
 app.post('/addRating',  async (req, res) => {
     const { datosRating } = req.body;
 
@@ -119,6 +122,7 @@ app.post('/addRating',  async (req, res) => {
         const newRating = new Rating({
             user_id: datosRating.user_id,
             movie_id: datosRating.movie_id,
+            movie_poster: datosRating.movie_poster,
             critic: datosRating.critic,
             rating: datosRating.rating
         });
@@ -134,3 +138,127 @@ app.post('/addRating',  async (req, res) => {
     }
 
 })
+
+app.get('/user-movie', async (req, res) => {
+    const { user_id, movie_id } = req.query;
+
+    try {
+        const rating = await mongoose.connection.db
+            .collection('ratings')
+            .findOne({ user_id, movie_id });
+
+        if (rating) {
+            res.status(200).json({rating: rating, result: true});
+        } else {
+            res.status(404).json({ result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+app.get('/user-movies', async (req, res) => {
+    const { user_id } = req.query;
+
+    try {
+        const ratings = await mongoose.connection.db
+            .collection('ratings')
+            .find({ user_id })
+            .toArray();
+
+        if (ratings) {
+            res.status(200).json({ratings: ratings, result: true});
+        } else {
+            res.status(404).json({ result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+
+// LIKES
+app.post('/addLike', async (req, res) => {
+    const { datosLike } = req.body;
+    console.log(datosLike)
+    try {
+        const newLike = new like({
+            user_id: datosLike.user_id,
+            movie_id: datosLike.movie_id,
+        });
+        await newLike.save();
+
+        res.status(201).json({ message: 'Like Creado', result: true  });
+    }catch (error) {
+        res.status(500).json({ message: 'Internal server error', result: false });
+    }
+});
+
+app.post('/removeLike', async (req, res) =>{
+
+    const { datosLike } = req.body;
+    try {
+        const result = await mongoose.connection.db
+            .collection('likes')
+            .deleteOne({ 
+                user_id: datosLike.user_id, 
+                movie_id: datosLike.movie_id 
+            });
+
+        if (result.deletedCount === 1) {
+            res.status(200).json({ 
+                message: 'Like removed successfully', 
+                result: true 
+            });
+        } else {
+            res.status(404).json({ 
+                message: 'Like not found', 
+                result: false 
+            });
+        }
+    } catch (error) {
+        console.error('Error removing like:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            result: false 
+        });
+    }
+    
+}); 
+
+app.get('/user-liked-movie', async (req, res) => {
+    const { user_id, movie_id } = req.query;
+
+    try {
+        const like = await mongoose.connection.db
+            .collection('likes')
+            .findOne({ user_id, movie_id });
+
+        if (like) {
+            res.status(200).json({likedMovie: true, result: true});
+        } else {
+            res.status(404).json({likedMovie: false, result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+app.get('/user-liked-movies', async (req, res) => {
+    const { user_id } = req.query;
+
+    try {
+        const likedMovies = await mongoose.connection.db
+            .collection('likes')
+            .find({ user_id })
+            .toArray();
+
+        if (likedMovies) {
+            res.status(200).json({likedMovies: rating, result: true});
+        } else {
+            res.status(404).json({ result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
