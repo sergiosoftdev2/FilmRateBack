@@ -54,6 +54,8 @@ app.get('/user/:id', async (req, res) => {
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
+    console.log(email, password) // Imprimir los valores para depuración
+
     try {
         const user = await mongoose.connection.db.collection('usuarios').findOne({ email });
 
@@ -112,7 +114,7 @@ app.post('/register', async (req, res) => {
 });
 
 
-// USER MOVIE RATINGS
+// RATINGS
 app.post('/addRating',  async (req, res) => {
     const { datosRating } = req.body;
 
@@ -168,6 +170,47 @@ app.get('/user-movies', async (req, res) => {
 
         if (ratings) {
             res.status(200).json({ratings: ratings, result: true});
+        } else {
+            res.status(404).json({ result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+app.get('/last-ratings', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+        
+        // Usar find() para obtener los ratings y también para contar el total
+        const ratings = await mongoose.connection.db
+            .collection('ratings')
+            .find()
+            .sort({ fecha_creacion: -1 })
+            .skip(skip) // Saltar documentos según la página
+            .limit(limit) // Limitar resultados según el parámetro
+            .toArray();
+            
+
+        const allRatings = await mongoose.connection.db
+            .collection('ratings')
+            .find()
+            .toArray();
+        const total = allRatings.length;
+
+        if (ratings && ratings.length > 0) {
+            res.status(200).json({
+                ratings: ratings,
+                result: true,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit)
+                }
+            });
         } else {
             res.status(404).json({ result: false });
         }
