@@ -5,6 +5,7 @@ const Usuario = require('./models/usuarios');
 const { generateHashedPassword, comparePassword } = require('./shared/functions');
 const Rating = require('./models/ratings');
 const like = require('./models/likes');
+const follow = require('./models/follows');
 
 const uri = "mongodb+srv://sergiogarlo12:FilmRate2025@filmrate.wnqbttl.mongodb.net/?retryWrites=true&w=majority&appName=filmRate";
 const clientOptions = { serverApi: { version: '1', strict: true, deprecationErrors: true } };
@@ -54,8 +55,6 @@ app.get('/user/:id', async (req, res) => {
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    console.log(email, password) // Imprimir los valores para depuración
-
     try {
         const user = await mongoose.connection.db.collection('usuarios').findOne({ email });
 
@@ -95,8 +94,6 @@ app.post('/register', async (req, res) => {
             imagen: datosUsuario.imagen,
         });
 
-        console.log('Password en el modelo:', newUser.password);
-
         await newUser.save();
         
         // Send a success response
@@ -117,8 +114,6 @@ app.post('/register', async (req, res) => {
 // RATINGS
 app.post('/addRating',  async (req, res) => {
     const { datosRating } = req.body;
-
-    console.log(datosRating)
 
     try {
         const newRating = new Rating({
@@ -166,6 +161,7 @@ app.get('/user-movies', async (req, res) => {
         const ratings = await mongoose.connection.db
             .collection('ratings')
             .find({ user_id })
+            .sort({ fecha_creacion: -1 })
             .toArray();
 
         if (ratings) {
@@ -223,7 +219,6 @@ app.get('/last-ratings', async (req, res) => {
 // LIKES
 app.post('/addLike', async (req, res) => {
     const { datosLike } = req.body;
-    console.log(datosLike)
     try {
         const newLike = new like({
             user_id: datosLike.user_id,
@@ -233,7 +228,7 @@ app.post('/addLike', async (req, res) => {
 
         res.status(201).json({ message: 'Like Creado', result: true  });
     }catch (error) {
-        res.status(500).json({ message: 'Internal server error', result: false });
+        res.status(500).json({ message: error, error: error, result: false });
     }
 });
 
@@ -297,7 +292,7 @@ app.get('/user-liked-movies', async (req, res) => {
             .toArray();
 
         if (likedMovies) {
-            res.status(200).json({likedMovies: rating, result: true});
+            res.status(200).json({likedMovies: likedMovies, result: true});
         } else {
             res.status(404).json({ result: false });
         }
@@ -305,3 +300,112 @@ app.get('/user-liked-movies', async (req, res) => {
         res.status(500).json({ message: 'Server error', error });
     }
 });
+
+// FOLLOWS
+app.post('/addFollow', async (req, res) => {
+    const { datosFollow } = req.body;
+    try {
+        const newFollow = new follow({
+            following_user_id: datosFollow.following_user_id,
+            follower_user_id: datosFollow.follower_user_id,
+        });
+        await newFollow.save();
+        res.status(201).json({ message: 'Follow Creado', result: true  });
+    }catch (error) {
+        res.status(500).json({ message: error, error: error, result: false });
+    }
+})
+
+app.post('/removeFollow', async (req, res) =>{
+    const { datosFollow } = req.body;
+    try {
+        const result = await mongoose.connection.db
+           .collection('follows')
+           .deleteOne({
+                following_user_id: datosFollow.following_user_id,
+                follower_user_id: datosFollow.follower_user_id
+            });
+        if (result.deletedCount === 1) {
+            res.status(200).json({ message: 'Follow removed successfully', result: true });
+        } else {
+            res.status(404).json({ message: 'Follow not found', result: false });
+        }
+    } catch (error) {
+        console.error('Error removing follow:', error);
+        res.status(500).json({ message: 'Internal server error', result: false });
+    }
+})
+
+app.get('/user-following', async (req, res) => {
+    const { user_id, following_user_id } = req.query;
+    try {
+        const follow = await mongoose.connection.db
+           .collection('follows')
+           .findOne({ follower_user_id: user_id, following_user_id: following_user_id });
+        if (follow) {
+            res.status(200).json({ following: true, result: true });
+        }
+    }catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+})
+
+app.get('/user-followings', async (req, res) => {
+    const { user_id } = req.query;
+    try {
+        const followings = await mongoose.connection.db
+         .collection('follows')
+         .find({ following_user_id: user_id })
+         .toArray();
+        if (followings) {
+            res.status(200).json({ followings: followings, result: true });
+        }
+    }catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+app.get('/user-followings-count', async (req, res) => {
+    const { user_id } = req.query;
+    try {
+        const followings = await mongoose.connection.db
+        .collection('follows')
+        .find({ following_user_id: user_id })
+        .toArray();
+        if (followings) {
+            res.status(200).json({ followings: followings.length, result: true });
+        }
+    }catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+})
+
+app.get('/user-followers', async (req, res) => {
+    const { user_id } = req.query;
+    try {
+        const followers = await mongoose.connection.db
+          .collection('follows')
+          .find({ following_user_id: user_id })
+          .toArray();
+        if (followers) {
+            res.status(200).json({ followers: followers, result: true });
+        }
+    }catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+})
+
+app.get('/user-followers-count', async (req, res) => {
+    const { user_id } = req.query;
+    try {
+        const followers = await mongoose.connection.db
+         .collection('follows')
+         .find({ following_user_id: user_id })
+         .toArray();
+        if (followers) {
+            res.status(200).json({ followers: followers.length, result: true });
+        }
+    }catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+})
