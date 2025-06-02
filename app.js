@@ -174,6 +174,53 @@ app.get('/user-movies', async (req, res) => {
     }
 });
 
+app.get('/user-movies', async (req, res) => {
+    const { user_id } = req.query;
+
+    try {
+        const ratings = await mongoose.connection.db
+            .collection('ratings')
+            .find({ user_id })
+            .sort({ fecha_creacion: -1 })
+            .toArray();
+
+        if (ratings) {
+            res.status(200).json({ratings: ratings, result: true});
+        } else {
+            res.status(404).json({ result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+app.get('/users-movies', async (req, res) => {
+    const { user_ids } = req.query;
+
+    try {
+
+        const userIdsArray = Array.isArray(user_ids)
+            ? user_ids
+            : typeof user_ids === 'string'
+                ? user_ids.split(',')
+                : [];
+
+        if (userIdsArray.length === 0) {
+            return res.status(400).json({ result: false, message: 'No user_ids provided' });
+        }
+
+        const ratings = await mongoose.connection.db
+            .collection('ratings')
+            .find({ user_id: { $in: userIdsArray } })
+            .sort({ fecha_creacion: -1 })
+            .toArray();
+
+        res.status(200).json({ ratings, result: true });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
 app.get('/last-ratings', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -355,7 +402,8 @@ app.get('/user-followings', async (req, res) => {
     try {
         const followings = await mongoose.connection.db
          .collection('follows')
-         .find({ following_user_id: user_id })
+         .find({ follower_user_id: user_id })
+         .project({ following_user_id: 1 })
          .toArray();
         if (followings) {
             res.status(200).json({ followings: followings, result: true });
@@ -370,7 +418,7 @@ app.get('/user-followings-count', async (req, res) => {
     try {
         const followings = await mongoose.connection.db
         .collection('follows')
-        .find({ following_user_id: user_id })
+        .find({ follower_user_id: user_id })
         .toArray();
         if (followings) {
             res.status(200).json({ followings: followings.length, result: true });
