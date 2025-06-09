@@ -6,6 +6,7 @@ const { generateHashedPassword, comparePassword } = require('./shared/functions'
 const Rating = require('./models/ratings');
 const like = require('./models/likes');
 const follow = require('./models/follows');
+const watchlist = require('./models/watchlist');
 
 const uri = "mongodb+srv://sergiogarlo12:FilmRate2025@filmrate.wnqbttl.mongodb.net/?retryWrites=true&w=majority&appName=filmRate";
 const clientOptions = { serverApi: { version: '1', strict: true, deprecationErrors: true } };
@@ -341,6 +342,91 @@ app.get('/user-liked-movies', async (req, res) => {
         if (likedMovies) {
             res.status(200).json({likedMovies: likedMovies, result: true});
         } else {
+            res.status(404).json({ result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+// WATCHLIST
+app.post('/addWatchlist', async (req, res) => {
+    const { datosWatchList } = req.body;
+    try {
+        const newWatchlist = new watchlist({
+            user_id: datosWatchList.user_id,
+            movie_id: datosWatchList.movie_id,
+        });
+        await newWatchlist.save();
+
+        res.status(201).json({ message: 'Watchlist Creado', result: true  });
+    }catch (error) {
+        res.status(500).json({ message: error, error: error, result: false });
+    }
+});
+
+app.post('/removeWatchlist', async (req, res) =>{
+
+    const { datosWatchList } = req.body;
+    try {
+        const result = await mongoose.connection.db
+            .collection('watchlists')
+            .deleteOne({ 
+                user_id: datosWatchList.user_id, 
+                movie_id: datosWatchList.movie_id 
+            });
+
+        if (result.deletedCount === 1) {
+            res.status(200).json({ 
+                message: 'watchlist removed successfully', 
+                result: true 
+            });
+        } else {
+            res.status(404).json({ 
+                message: 'watchlist not found', 
+                result: false 
+            });
+        }
+    } catch (error) {
+        console.error('Error removing like:', error);
+        res.status(500).json({ 
+            message: 'Internal server error', 
+            result: false 
+        });
+    }
+    
+}); 
+
+app.get('/user-watchlist-movie', async (req, res) => {
+    const { user_id, movie_id } = req.query;
+
+    try {
+        const watchlist = await mongoose.connection.db
+            .collection('watchlists')
+            .findOne({ user_id, movie_id });
+
+        if (watchlist) {
+            res.status(200).json({watchlist: true, result: true});
+        } else {
+            res.status(404).json({watchlist: false, result: false });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
+
+app.get('/user-watchlist-movies', async (req, res) => {
+    const { user_id } = req.query;
+
+    try {
+        const watchlistMovies = await mongoose.connection.db
+            .collection('watchlists')
+            .find({ user_id })
+            .toArray();
+        if (watchlistMovies) {
+            res.status(200).json({watchlistMovies: watchlistMovies, result: true});
+        } else {
+            console.log(watchlistMovies)
             res.status(404).json({ result: false });
         }
     } catch (error) {
